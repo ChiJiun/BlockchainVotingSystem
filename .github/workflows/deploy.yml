@@ -1,0 +1,39 @@
+name: Deploy and Contract Operations
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Contract action to perform"
+        required: true
+        default: "deploy"
+        type: choice
+        options:
+          - deploy
+          - addProposal
+          - endVoting
+
+jobs:
+  contract-operations:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run contract operations
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          RPC_URL: ${{ secrets.RPC_URL }}
+          CONTRACT_ADDRESS: ${{ secrets.CONTRACT_ADDRESS }}
+        run: |
+          node scripts/contract-operations.js ${{ github.event.inputs.action }}
