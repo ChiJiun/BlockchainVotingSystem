@@ -6,38 +6,145 @@ dotenv.config();
 
 async function main() {
   try {
-    // 檢查環境變數
+    console.log("合約操作腳本開始執行...");
+
+    // 從環境變數讀取設定
     const CONTRACT_ADDRESS = process.env.VITE_CONTRACT_ADDRESS;
+    const RPC_URL = process.env.RPC_URL;
+    const NETWORK_NAME = process.env.NETWORK_NAME || "sepolia";
+    const CHAIN_ID = process.env.CHAIN_ID || "11155111";
+
+    // 檢查必要的環境變數
     if (!CONTRACT_ADDRESS) {
-      throw new Error("未設定合約地址，請檢查 .env 文件");
+      console.error(
+        "❌ 未設定合約地址，請檢查 .env 文件中的 VITE_CONTRACT_ADDRESS"
+      );
+      return;
     }
 
-    // 設置提供者（使用 Sepolia 測試網）
-    const provider = new ethers.providers.JsonRpcProvider(
-      "https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID"
-    );
+    if (!RPC_URL) {
+      console.error("❌ 未設定 RPC URL，請檢查 .env 文件中的 RPC_URL");
+      return;
+    }
 
-    // 讀取合約
-    const contract = new ethers.Contract(
-      CONTRACT_ADDRESS,
-      contractABI,
-      provider
-    );
+    console.log("✅ 合約地址:", CONTRACT_ADDRESS);
+    console.log("✅ RPC URL:", RPC_URL);
+    console.log("✅ 目標網路:", NETWORK_NAME, "(Chain ID:", CHAIN_ID, ")");
+    console.log("✅ ABI 函數數量:", contractABI.length);
 
-    // 獲取所有提案
-    console.log("正在讀取提案...");
-    const proposals = await contract.getAllProposals();
+    // 使用環境變數中的 RPC URL 建立 Provider
+    const provider = new ethers.JsonRpcProvider(RPC_URL);
 
-    console.log("\n=== 提案列表 ===");
-    proposals.forEach((proposal, index) => {
-      console.log(`\n提案 ${index + 1}:`);
-      console.log(`標題: ${proposal.title}`);
-      console.log(`描述: ${proposal.description}`);
-      console.log(`票數: ${proposal.voteCount.toString()}`);
-      console.log(`狀態: ${proposal.isActive ? "投票中" : "已結束"}`);
-    });
+    console.log("✅ Provider 已建立");
+
+    // 網路連接測試
+    try {
+      console.log("🔄 正在測試網路連接...");
+      const network = await provider.getNetwork();
+      console.log(
+        "✅ 成功連接到網路:",
+        network.name || "unknown",
+        "(Chain ID:",
+        network.chainId.toString(),
+        ")"
+      );
+
+      // 驗證是否連接到正確的網路
+      if (network.chainId.toString() !== CHAIN_ID) {
+        console.warn("⚠️  警告: 連接的網路 Chain ID 與設定不符");
+        console.warn("   預期:", CHAIN_ID, "實際:", network.chainId.toString());
+      }
+
+      // 測試區塊高度
+      const blockNumber = await provider.getBlockNumber();
+      console.log("✅ 當前區塊高度:", blockNumber);
+    } catch (networkError) {
+      console.error("❌ 網路連接失敗:", networkError.message);
+      console.error("請檢查 RPC_URL 是否正確:", RPC_URL);
+      return;
+    }
+
+    // 檢查合約是否存在
+    try {
+      console.log("🔄 正在檢查合約...");
+      const code = await provider.getCode(CONTRACT_ADDRESS);
+      if (code === "0x") {
+        console.error("❌ 在指定地址找不到合約");
+        console.error("請檢查合約地址是否正確，或合約是否已部署到正確的網路");
+        return;
+      }
+      console.log("✅ 合約存在於指定地址");
+      console.log("✅ 合約代碼長度:", code.length, "字符");
+    } catch (contractError) {
+      console.error("❌ 合約檢查失敗:", contractError.message);
+      return;
+    }
+
+    // 使用 ABI 讀取合約資料
+    try {
+      console.log("🔄 正在初始化合約實例...");
+      const contract = new ethers.Contract(
+        CONTRACT_ADDRESS,
+        contractABI,
+        provider
+      );
+
+      console.log("🔄 正在讀取提案...");
+      const proposals = await contract.getAllProposals();
+      console.log("✅ 成功讀取", proposals.length, "個提案");
+
+      if (proposals.length === 0) {
+        console.log("📋 目前沒有任何提案");
+      } else {
+        console.log("\n" + "=".repeat(50));
+        console.log("📋 提案列表:");
+        console.log("=".repeat(50));
+
+        proposals.forEach((proposal, index) => {
+          console.log(`\n📋 提案 ${index + 1}:`);
+          console.log(`   🆔 ID: ${proposal.id || index}`);
+          console.log(
+            `   📝 標題: ${proposal.title || proposal.name || "無標題"}`
+          );
+          console.log(
+            `   📄 描述: ${proposal.description || proposal.desc || "無描述"}`
+          );
+          console.log(`   📊 票數: ${proposal.voteCount?.toString() || "0"}`);
+          console.log(
+            `   🔄 狀態: ${proposal.isActive ? "✅ 投票中" : "❌ 已結束"}`
+          );
+
+          // 如果有其他屬性，也顯示出來
+          if (proposal.startTime) {
+            console.log(
+              `   ⏰ 開始時間: ${new Date(
+                Number(proposal.startTime) * 1000
+              ).toLocaleString()}`
+            );
+          }
+          if (proposal.endTime) {
+            console.log(
+              `   ⏱️  結束時間: ${new Date(
+                Number(proposal.endTime) * 1000
+              ).toLocaleString()}`
+            );
+          }
+        });
+        console.log("\n" + "=".repeat(50));
+      }
+    } catch (abiError) {
+      console.error("❌ 無法讀取合約資料:", abiError.message);
+      console.error("可能的原因:");
+      console.error("1. ABI 與合約不匹配");
+      console.error("2. getAllProposals 函數不存在或名稱不同");
+      console.error("3. 合約函數需要特定參數");
+      console.error("\n完整錯誤:", abiError);
+    }
+
+    console.log("✅ 腳本執行完成");
   } catch (error) {
-    console.error("錯誤:", error.message);
+    console.error("❌ 執行錯誤:", error.message);
+    console.error("完整錯誤:", error);
     process.exit(1);
   }
 }

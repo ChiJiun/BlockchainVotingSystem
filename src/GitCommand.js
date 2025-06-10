@@ -11,6 +11,10 @@ git add .
 git commit -m "proposal"
 git push origin main
 
-npm run build      # 打包
-npm run deploy     # 部署到 gh-pages 分支
+# 執行合約腳本
+npm run contract
+
+# 建置和部署
+npm run build
+npm run deploy
 */
