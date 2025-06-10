@@ -8,7 +8,7 @@ git push -u origin main
 
 git status
 git add .
-git commit -m ""
+git commit -m "proposal"
 git push origin main
 
 npm run build      # 打包
