@@ -1,6 +1,5 @@
 import dotenv from "dotenv";
 import { ethers } from "ethers";
-import { contractABI } from "../src/ABI.js";
 
 dotenv.config();
 
@@ -30,7 +29,6 @@ async function main() {
     console.log("✅ 合約地址:", CONTRACT_ADDRESS);
     console.log("✅ RPC URL:", RPC_URL);
     console.log("✅ 目標網路:", NETWORK_NAME, "(Chain ID:", CHAIN_ID, ")");
-    console.log("✅ ABI 函數數量:", contractABI.length);
 
     // 使用環境變數中的 RPC URL 建立 Provider
     const provider = new ethers.JsonRpcProvider(RPC_URL);
@@ -80,9 +78,14 @@ async function main() {
       return;
     }
 
-    // 使用 ABI 讀取合約資料
+    // 嘗試動態導入 ABI（如果存在的話）
     try {
+      console.log("🔄 正在嘗試載入 ABI...");
+      const { contractABI } = await import("../src/ABI.js");
+
+      console.log("✅ ABI 載入成功，函數數量:", contractABI.length);
       console.log("🔄 正在初始化合約實例...");
+
       const contract = new ethers.Contract(
         CONTRACT_ADDRESS,
         contractABI,
@@ -113,32 +116,15 @@ async function main() {
           console.log(
             `   🔄 狀態: ${proposal.isActive ? "✅ 投票中" : "❌ 已結束"}`
           );
-
-          // 如果有其他屬性，也顯示出來
-          if (proposal.startTime) {
-            console.log(
-              `   ⏰ 開始時間: ${new Date(
-                Number(proposal.startTime) * 1000
-              ).toLocaleString()}`
-            );
-          }
-          if (proposal.endTime) {
-            console.log(
-              `   ⏱️  結束時間: ${new Date(
-                Number(proposal.endTime) * 1000
-              ).toLocaleString()}`
-            );
-          }
         });
         console.log("\n" + "=".repeat(50));
       }
     } catch (abiError) {
-      console.error("❌ 無法讀取合約資料:", abiError.message);
-      console.error("可能的原因:");
-      console.error("1. ABI 與合約不匹配");
-      console.error("2. getAllProposals 函數不存在或名稱不同");
-      console.error("3. 合約函數需要特定參數");
-      console.error("\n完整錯誤:", abiError);
+      console.log("ℹ️  無法載入或使用 ABI:", abiError.message);
+      console.log("📝 請確保:");
+      console.log("   1. src/ABI.js 文件存在");
+      console.log("   2. 文件正確導出 contractABI");
+      console.log("   3. ABI 包含 getAllProposals 函數");
     }
 
     console.log("✅ 腳本執行完成");
