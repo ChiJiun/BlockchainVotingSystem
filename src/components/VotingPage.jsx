@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useAccount, useReadContract } from 'wagmi'
 import { contractABI } from '../ABI.js'
+import { giveRightToVote, checkVotingRight } from './giveRight.js'
 
 function VotingPage() {
   const { isConnected, address, chain } = useAccount()
   const [proposals, setProposals] = useState([])
-  const [isRequestingRights, setIsRequestingRights] = useState(false)
-  const [requestStatus, setRequestStatus] = useState(null)
+  const [isGranting, setIsGranting] = useState(false)
   
   // 從環境變數讀取智能合約地址
   const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS
@@ -19,92 +19,107 @@ function VotingPage() {
     enabled: !!CONTRACT_ADDRESS,
   })
 
-  // 檢查用戶是否已有投票權
-  const { data: hasVotingRight, isLoading: checkingRights, refetch: refetchRights } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: contractABI,
-    functionName: 'hasVotingRight',
-    args: [address],
-    enabled: !!CONTRACT_ADDRESS && !!address && isConnected,
-  })
-
-  // 處理投票權申請
-  const handleRequestVotingRights = async () => {
+  // 處理獲得投票權 - 使用當前連接的錢包地址
+  const handleGrantVotingRight = async () => {
     if (!isConnected || !address) {
       alert('請先連接錢包')
       return
     }
 
-    setIsRequestingRights(true)
-    setRequestStatus(null)
+    setIsGranting(true)
 
     try {
-      const token = import.meta.env.VITE_GITHUB_TOKEN
+      const result = await giveRightToVote(address)
       
-      if (!token) {
-        throw new Error('GitHub Token 未設定，請檢查環境變數 VITE_GITHUB_TOKEN')
-      }
-
-      console.log('🔍 發送投票權申請...')
-      console.log('錢包地址:', address)
-      console.log('鏈 ID:', chain?.id)
-
-      const response = await fetch('https://api.github.com/repos/ChiJiun/BlockchainVotingSystem/actions/workflows/give-right.yml/dispatches', {
-        method: 'POST',
-        headers: {
-          'Authorization': `token ${token}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ref: 'main',
-          inputs: {
-            walletAddress: address,
-            chainId: chain?.id?.toString() || '',
-            requestTimestamp: new Date().toISOString()
-          }
-        })
-      })
-
-      console.log('GitHub API 回應狀態:', response.status)
-
-      if (response.ok) {
-        console.log('✅ GitHub Actions 觸發成功')
-        setRequestStatus({
-          type: 'success',
-          message: '✅ 投票權申請已提交！GitHub Actions 正在處理中...',
-          details: `錢包地址: ${address}`
-        })
-        
-        // 30 秒後自動重新檢查投票權
-        setTimeout(() => {
-          refetchRights()
-        }, 30000)
-        
+      if (result.success) {
+        alert(`投票權獲得成功！\n目標地址: ${address}\n交易哈希: ${result.txHash}`)
       } else {
-        const errorText = await response.text()
-        console.error('GitHub API 詳細錯誤:', errorText)
-        
-        if (response.status === 404) {
-          throw new Error('找不到 GitHub Actions workflow 文件。請確保倉庫中存在 .github/workflows/give-right.yml 文件')
-        } else if (response.status === 401) {
-          throw new Error('GitHub Token 認證失敗。請檢查 token 是否正確且有效')
-        } else if (response.status === 403) {
-          throw new Error('GitHub Token 權限不足。請確保 token 有 Actions 權限')
-        } else {
-          throw new Error(`GitHub API 錯誤 (${response.status}): ${errorText}`)
-        }
+        alert(`獲得失敗: ${result.message}`)
       }
-
     } catch (error) {
-      console.error('申請投票權失敗:', error)
-      setRequestStatus({
-        type: 'error',
-        message: `❌ 申請失敗: ${error.message}`,
-        details: '請檢查錯誤信息並重試'
-      })
+      console.error('獲得投票權失敗:', error)
+      alert('操作失敗，請檢查控制台')
     } finally {
-      setIsRequestingRights(false)
+      setIsGranting(false)
+    }
+  }
+
+  // 將 uint256 轉換為字符串
+  const uint256ToString = (uint256Value) => {
+    if (!uint256Value) return ''
+    
+    try {
+      // 如果是 BigInt 或數字，直接轉換
+      if (typeof uint256Value === 'bigint' || typeof uint256Value === 'number') {
+        const hexString = uint256Value.toString(16)
+        // 移除前導零
+        const cleanHex = hexString.replace(/^0+/, '') || '0'
+        // 將十六進制轉換為字符串（假設每兩個字符是一個 ASCII 字符）
+        let result = ''
+        for (let i = 0; i < cleanHex.length; i += 2) {
+          const byte = parseInt(cleanHex.substr(i, 2), 16)
+          if (byte > 0) { // 跳過空字節
+            result += String.fromCharCode(byte)
+          }
+        }
+        return result || uint256Value.toString()
+      }
+      
+      // 如果是字符串格式的數字
+      if (typeof uint256Value === 'string') {
+        // 如果已經是可讀的字符串，直接返回
+        if (!/^\d+$/.test(uint256Value) && !/^0x[0-9a-fA-F]+$/.test(uint256Value)) {
+          return uint256Value
+        }
+        
+        // 嘗試將十六進制或十進制字符串轉換
+        const num = BigInt(uint256Value)
+        return uint256ToString(num)
+      }
+      
+      return uint256Value.toString()
+    } catch (error) {
+      console.error('轉換 uint256 為字符串時出錯:', error)
+      return uint256Value.toString()
+    }
+  }
+
+  // 處理提案數據 - 簡化版本，只處理名稱
+  const formatProposalData = (proposal, index) => {
+    try {
+      let proposalName = `提案 ${index + 1}`
+      
+      if (Array.isArray(proposal)) {
+        // Solidity struct 格式 [name, ...]
+        if (proposal[0] !== undefined) {
+          proposalName = uint256ToString(proposal[0]) || proposalName
+        } else if (proposal[1] !== undefined) {
+          proposalName = uint256ToString(proposal[1]) || proposalName
+        }
+      } else if (typeof proposal === 'object' && proposal !== null) {
+        // 物件格式
+        if (proposal.name !== undefined) {
+          proposalName = uint256ToString(proposal.name) || proposalName
+        } else if (proposal.title !== undefined) {
+          proposalName = uint256ToString(proposal.title) || proposalName
+        } else if (proposal[0] !== undefined) {
+          proposalName = uint256ToString(proposal[0]) || proposalName
+        }
+      } else if (proposal) {
+        // 直接是名稱
+        proposalName = uint256ToString(proposal) || proposalName
+      }
+      
+      return {
+        id: index,
+        name: proposalName
+      }
+    } catch (error) {
+      console.error(`處理提案 ${index} 時發生錯誤:`, error)
+      return {
+        id: index,
+        name: `提案 ${index + 1}`
+      }
     }
   }
 
@@ -115,13 +130,9 @@ function VotingPage() {
     console.log('錢包地址:', address)
     console.log('當前網路:', chain?.name, chain?.id)
     console.log('合約地址:', CONTRACT_ADDRESS)
-    console.log('ABI 函數數量:', contractABI?.length)
     console.log('proposalsData:', proposalsData)
     console.log('proposalsData 類型:', typeof proposalsData)
     console.log('是否為陣列:', Array.isArray(proposalsData))
-    console.log('isError:', isError)
-    console.log('error:', error)
-    console.log('hasVotingRight:', hasVotingRight)
     console.log('========================')
 
     if (proposalsData) {
@@ -130,53 +141,27 @@ function VotingPage() {
         let processedProposals = []
         
         if (Array.isArray(proposalsData)) {
-          // 如果是陣列，直接處理
+          // 如果是陣列，處理每個提案
           processedProposals = proposalsData.map((proposal, index) => {
-            console.log(`提案 ${index}:`, proposal)
-            
-            // 處理不同的數據格式
-            if (typeof proposal === 'object' && proposal !== null) {
-              // 如果是物件，嘗試提取屬性
-              return {
-                id: proposal.id || proposal[0] || index,
-                title: proposal.title || proposal.name || proposal[1] || `提案 ${index + 1}`,
-                description: proposal.description || proposal.desc || proposal[2] || '無描述',
-                voteCount: proposal.voteCount || proposal.votes || proposal[3] || 0,
-                isActive: proposal.isActive !== undefined ? proposal.isActive : proposal[4] !== undefined ? proposal[4] : true
-              }
-            } else if (Array.isArray(proposal)) {
-              // 如果提案本身是陣列（可能來自 Solidity struct）
-              return {
-                id: proposal[0] || index,
-                title: proposal[1] || `提案 ${index + 1}`,
-                description: proposal[2] || '無描述',
-                voteCount: proposal[3] || 0,
-                isActive: proposal[4] !== undefined ? proposal[4] : true
-              }
-            } else {
-              // 如果是基本類型
-              return {
-                id: index,
-                title: `提案 ${index + 1}`,
-                description: proposal.toString() || '無描述',
-                voteCount: 0,
-                isActive: true
-              }
-            }
+            console.log(`原始提案 ${index}:`, proposal)
+            const formatted = formatProposalData(proposal, index)
+            console.log(`格式化提案 ${index}:`, formatted)
+            return formatted
           })
         } else if (proposalsData && typeof proposalsData === 'object') {
           // 如果是單一物件，轉換為陣列
-          processedProposals = [proposalsData]
+          const formatted = formatProposalData(proposalsData, 0)
+          processedProposals = [formatted]
         }
         
-        console.log('處理後的提案:', processedProposals)
+        console.log('最終處理後的提案:', processedProposals)
         setProposals(processedProposals)
       } catch (err) {
         console.error('處理提案數據時發生錯誤:', err)
         setProposals([])
       }
     }
-  }, [proposalsData, isConnected, address, chain, CONTRACT_ADDRESS, isError, error, hasVotingRight])
+  }, [proposalsData, isConnected, address, chain, CONTRACT_ADDRESS, isError, error])
 
   // 檢查合約地址是否已設定
   if (!CONTRACT_ADDRESS) {
@@ -264,217 +249,221 @@ function VotingPage() {
     )
   }
 
+  // 顯示連接信息
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
+    <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
       <h2 style={{ textAlign: 'center', marginBottom: '30px', color: '#000' }}>📋 提案列表</h2>
       
-      {/* 投票權管理區域 */}
-      {isConnected && (
-        <div style={{
-          marginBottom: '30px',
-          padding: '20px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '10px',
-          border: '2px solid #e9ecef'
-        }}>
-          <h3 style={{ color: '#000', marginTop: 0, marginBottom: '15px' }}>🗳️ 投票權管理</h3>
-          
-          {checkingRights ? (
-            <div style={{ color: '#666' }}>
-              <span>⏳ 檢查投票權狀態中...</span>
-            </div>
-          ) : hasVotingRight ? (
-            <div style={{
-              padding: '15px',
-              backgroundColor: '#d4edda',
-              borderRadius: '8px',
-              border: '1px solid #c3e6cb',
-              color: '#155724'
-            }}>
-              <span style={{ fontSize: '18px' }}>✅ 您已擁有投票權！</span>
-              <p style={{ margin: '8px 0 0 0', fontSize: '14px' }}>
-                您可以對下方的提案進行投票
+      {/* 簡化的獲得投票權區域 */}
+      <div style={{
+        marginBottom: '30px',
+        padding: '20px',
+        backgroundColor: '#f8f9fa',
+        borderRadius: '8px',
+        border: '1px solid #ddd'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          {isConnected && address ? (
+            <div>
+              <p style={{ margin: '0 0 15px 0', color: '#000', fontSize: '14px' }}>
+                <strong>目標錢包地址:</strong> 
+                <code style={{ 
+                  backgroundColor: '#e9ecef', 
+                  padding: '2px 6px', 
+                  borderRadius: '3px',
+                  fontSize: '12px',
+                  marginLeft: '8px',
+                  wordBreak: 'break-all'
+                }}>
+                  {address}
+                </code>
               </p>
+              <button
+                onClick={handleGrantVotingRight}
+                disabled={isGranting}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: isGranting ? '#6c757d' : '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: isGranting ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '14px'
+                }}
+              >
+                {isGranting ? '⏳ 獲得中...' : '✅ 認證獲得投票權'}
+              </button>
             </div>
           ) : (
             <div>
-              <div style={{
-                padding: '15px',
-                backgroundColor: '#fff3cd',
-                borderRadius: '8px',
-                border: '1px solid #ffeaa7',
-                color: '#856404',
-                marginBottom: '15px'
-              }}>
-                <span style={{ fontSize: '16px' }}>⚠️ 您尚未擁有投票權</span>
-                <p style={{ margin: '8px 0 0 0', fontSize: '14px' }}>
-                  點擊下方按鈕申請投票權，系統將自動處理您的申請
-                </p>
-              </div>
-
+              <p style={{ margin: '0 0 15px 0', color: '#856404' }}>
+                ⚠️ 請先連接錢包才能獲得投票權
+              </p>
               <button
-                onClick={handleRequestVotingRights}
-                disabled={isRequestingRights}
+                disabled
                 style={{
                   padding: '12px 24px',
-                  backgroundColor: isRequestingRights ? '#6c757d' : '#28a745',
+                  backgroundColor: '#6c757d',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '8px',
-                  cursor: isRequestingRights ? 'not-allowed' : 'pointer',
-                  fontSize: '16px',
+                  borderRadius: '5px',
+                  cursor: 'not-allowed',
                   fontWeight: 'bold',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
+                  fontSize: '14px'
                 }}
               >
-                {isRequestingRights ? (
-                  <>
-                    <span>⏳</span>
-                    <span>處理中...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🚀</span>
-                    <span>申請投票權</span>
-                  </>
-                )}
+                🔒 需要連接錢包
               </button>
-
-              {/* 申請狀態顯示 */}
-              {requestStatus && (
-                <div style={{
-                  marginTop: '15px',
-                  padding: '15px',
-                  borderRadius: '8px',
-                  backgroundColor: requestStatus.type === 'success' ? '#d4edda' : '#f8d7da',
-                  border: `1px solid ${requestStatus.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`,
-                  color: requestStatus.type === 'success' ? '#155724' : '#721c24'
-                }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
-                    {requestStatus.message}
-                  </div>
-                  <div style={{ fontSize: '14px' }}>
-                    {requestStatus.details}
-                  </div>
-                  {requestStatus.type === 'success' && (
-                    <div style={{ 
-                      marginTop: '10px', 
-                      fontSize: '13px',
-                      color: '#0c5460',
-                      backgroundColor: '#b8daff',
-                      padding: '8px',
-                      borderRadius: '4px'
-                    }}>
-                      💡 提示: 處理可能需要 1-2 分鐘，請稍後刷新頁面查看結果
-                      <button
-                        onClick={() => refetchRights()}
-                        style={{
-                          marginLeft: '10px',
-                          padding: '4px 8px',
-                          backgroundColor: '#007bff',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '12px'
-                        }}
-                      >
-                        🔄 檢查狀態
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* 顯示連接信息 */}
       {isConnected ? (
         <div style={{
           marginBottom: '20px',
-          padding: '10px',
+          padding: '15px',
           backgroundColor: '#e8f5e8',
           borderRadius: '8px',
           fontSize: '14px',
-          color: '#000'
+          color: '#000',
+          border: '1px solid #c3e6cb'
         }}>
-          <p>✅ 錢包已連接: {address}</p>
-          <p>🌐 網路: {chain?.name} (ID: {chain?.id})</p>
-          <p>📄 合約: {CONTRACT_ADDRESS}</p>
-          <p>🗳️ 投票權: {hasVotingRight ? '✅ 已擁有' : '❌ 未擁有'}</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <strong>錢包狀態:</strong> ✅ 已連接
+            </div>
+            <div>
+              <strong>網路:</strong> {chain?.name} ({chain?.id})
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <strong>錢包地址:</strong> {address}
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <strong>合約地址:</strong> {CONTRACT_ADDRESS}
+            </div>
+          </div>
         </div>
       ) : (
         <div style={{
           marginBottom: '20px',
-          padding: '10px',
+          padding: '15px',
           backgroundColor: '#fff3cd',
           borderRadius: '8px',
           fontSize: '14px',
           color: '#856404',
           border: '1px solid #ffeaa7'
         }}>
-          <p>ℹ️ 您可以查看提案，但需要連接錢包才能投票</p>
-          <p>📄 合約: {CONTRACT_ADDRESS}</p>
+          <p style={{ margin: 0 }}>ℹ️ 您可以查看提案，但需要連接錢包才能操作</p>
+          <p style={{ margin: '8px 0 0 0' }}><strong>合約地址:</strong> {CONTRACT_ADDRESS}</p>
         </div>
       )}
       
       {/* 提案列表 */}
       <div style={{ marginBottom: '30px' }}>
-        <h3 style={{ color: '#000' }}>所有提案：</h3>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: '20px' 
+        }}>
+          <h3 style={{ color: '#000', margin: 0 }}>所有提案</h3>
+          <span style={{ 
+            fontSize: '14px', 
+            color: '#666',
+            backgroundColor: '#f8f9fa',
+            padding: '4px 8px',
+            borderRadius: '4px'
+          }}>
+            共 {proposals.length} 個
+          </span>
+        </div>
+
         {proposals && proposals.length > 0 ? (
-          proposals.map((proposal, index) => (
-            <div
-              key={proposal.id || index}
-              style={{
-                padding: '20px',
-                border: '2px solid #ddd',
-                borderRadius: '8px',
-                marginBottom: '15px',
-                backgroundColor: '#fff'
-              }}
-            >
-              <h4 style={{ margin: '0 0 10px 0', color: '#000' }}>
-                📋 {proposal.title}
-              </h4>
-              <p style={{ margin: '0 0 10px 0', color: '#000' }}>
-                {proposal.description}
-              </p>
-              <div style={{ display: 'flex', gap: '20px', fontSize: '14px', color: '#000' }}>
-                <span>🆔 提案ID: {proposal.id}</span>
-                <span>📊 票數: {proposal.voteCount?.toString() || '0'}</span>
-                <span style={{ color: proposal.isActive ? '#28a745' : '#dc3545' }}>
-                  {proposal.isActive ? '✅ 投票中' : '❌ 已結束'}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {proposals.map((proposal, index) => (
+              <div
+                key={proposal.id}
+                style={{
+                  padding: '15px 20px',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  backgroundColor: '#fff',
+                  transition: 'all 0.2s ease-in-out',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f8f9fa'
+                  e.target.style.borderColor = '#007bff'
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#fff'
+                  e.target.style.borderColor = '#ddd'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                  <span style={{ 
+                    fontSize: '20px', 
+                    color: '#007bff',
+                    fontWeight: 'bold',
+                    minWidth: '30px'
+                  }}>
+                    {index + 1}
+                  </span>
+                  <span style={{ 
+                    color: '#000',
+                    fontSize: '16px',
+                    fontWeight: '500'
+                  }}>
+                    {proposal.name}
+                  </span>
+                </div>
+                
+                <span style={{ 
+                  fontSize: '12px', 
+                  color: '#666',
+                  backgroundColor: '#f8f9fa',
+                  padding: '2px 6px',
+                  borderRadius: '3px'
+                }}>
+                  ID: {proposal.id}
                 </span>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         ) : (
           <div style={{ 
             textAlign: 'center', 
-            padding: '40px', 
+            padding: '60px 40px', 
             color: '#000',
             backgroundColor: '#f8f9fa',
-            borderRadius: '8px',
+            borderRadius: '12px',
             border: '2px dashed #ddd'
           }}>
-            <div style={{ fontSize: '48px', marginBottom: '15px' }}>📋</div>
-            <h4>目前沒有提案</h4>
-            <p style={{ margin: '10px 0 0 0' }}>可能是合約中還沒有提案，或者合約函數返回空數組</p>
+            <div style={{ fontSize: '64px', marginBottom: '20px' }}>📋</div>
+            <h4 style={{ margin: '0 0 10px 0', fontSize: '20px' }}>目前沒有提案</h4>
+            <p style={{ margin: '0 0 20px 0', color: '#666' }}>
+              可能是合約中還沒有提案，或者合約函數返回空數組
+            </p>
             <button 
               onClick={() => refetch()}
               style={{
-                marginTop: '15px',
-                padding: '10px 20px',
+                padding: '12px 24px',
                 backgroundColor: '#007bff',
                 color: 'white',
                 border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer'
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                transition: 'background-color 0.2s'
               }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#0056b3'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#007bff'}
             >
               🔄 重新載入提案
             </button>

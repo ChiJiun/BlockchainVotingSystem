@@ -8,7 +8,7 @@ git push -u origin main
 
 git status
 git add .
-git commit -m "private key"
+git commit -m "onchain"
 git push origin main
 
 # 執行合約腳本
