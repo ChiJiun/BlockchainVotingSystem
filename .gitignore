@@ -1,15 +1,3 @@
-# 依賴
-/node_modules
-/.pnp
-.pnp.js
-
-# 測試
-/coverage
-
-# 產品建置
-/build
-/dist
-
 # 環境變數
 .env
 .env.local
@@ -17,17 +5,9 @@
 .env.test.local
 .env.production.local
 
-# 日誌
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# 依賴
+node_modules/
 
-# 編輯器
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# 作業系統
-.DS_Store
-Thumbs.db
+# 產品建置
+dist/
+build/
