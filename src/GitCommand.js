@@ -8,7 +8,7 @@ git push -u origin main
 
 git status
 git add .
-git commit -m "onchain"
+git commit -m "Time"
 git push origin main
 
 # 執行合約腳本
@@ -17,4 +17,5 @@ npm run contract
 # 建置和部署
 npm run build
 npm run deploy
+
 */
