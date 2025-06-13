@@ -1,0 +1,174 @@
+.voting-page {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.voting-page-title {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #000;
+}
+
+.error-container {
+  text-align: center;
+  padding: 40px;
+}
+
+.error-message {
+  color: red;
+}
+
+.loading-message {
+  color: #000;
+}
+
+.network-info {
+  margin-top: 15px;
+  font-size: 14px;
+  color: #666;
+}
+
+.error-details {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #ffe6e6;
+  border-radius: 8px;
+  border: 1px solid #ff9999;
+  text-align: left;
+  max-width: 600px;
+  margin: 20px auto;
+}
+
+.error-details h4 {
+  color: #000;
+  margin-top: 0;
+}
+
+.error-details-content {
+  font-size: 14px;
+  color: #000;
+}
+
+.error-details-content p {
+  margin: 8px 0;
+}
+
+.error-details summary {
+  cursor: pointer;
+  color: #000;
+  margin-top: 10px;
+}
+
+.error-details pre {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  font-size: 12px;
+  background-color: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+  overflow: auto;
+}
+
+.reload-button {
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 15px;
+}
+
+.voting-rights-section {
+  margin-bottom: 30px;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.voting-rights-content {
+  text-align: center;
+}
+
+.wallet-address-display {
+  margin: 0 0 15px 0;
+  color: #000;
+  font-size: 14px;
+}
+
+.wallet-address-code {
+  background-color: #e9ecef;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  margin-left: 8px;
+  word-break: break-all;
+}
+
+.grant-voting-button {
+  padding: 12px 24px;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.grant-voting-button.active {
+  background-color: #28a745;
+  cursor: pointer;
+}
+
+.grant-voting-button.loading {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.grant-voting-button.disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.wallet-warning {
+  margin: 0 0 15px 0;
+  color: #856404;
+}
+
+.connection-info {
+  margin-bottom: 20px;
+  padding: 15px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #000;
+}
+
+.connection-info.connected {
+  background-color: #e8f5e8;
+  border: 1px solid #c3e6cb;
+}
+
+.connection-info.disconnected {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.connection-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.connection-grid-full {
+  grid-column: 1 / -1;
+}
+
+.connection-info p {
+  margin: 0;
+}
+
+.connection-info p:not(:first-child) {
+  margin-top: 8px;
+}
