@@ -1,0 +1,61 @@
+.emergency-stop-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.error-message {
+  color: #dc3545;
+  padding: 10px;
+  border: 1px solid #dc3545;
+  border-radius: 4px;
+  margin: 10px 0;
+}
+
+.success-message {
+  color: #28a745;
+  padding: 10px;
+  border: 1px solid #28a745;
+  border-radius: 4px;
+  margin: 10px 0;
+}
+
+.status-container {
+  margin: 20px 0;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.emergency-button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.emergency-button.stop {
+  background-color: #dc3545;
+  color: white;
+}
+
+.emergency-button.resume {
+  background-color: #28a745;
+  color: white;
+}
+
+.emergency-button:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.emergency-button:hover:not(:disabled) {
+  opacity: 0.9;
+}

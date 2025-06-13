@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { useAccount } from 'wagmi'
-import { giveRightToVote, checkVotingRight } from './giveRight.js'
+import { useState, useEffect } from 'react';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { contractABI } from '../ABI.js';
+import './GiveRightToVote.css';
 
 function GiveRightToVote({ 
   buttonText = "🗳️ 獲得投票權", 
@@ -9,149 +10,156 @@ function GiveRightToVote({
   compact = false,
   showStatus = true 
 }) {
-  const { isConnected, address } = useAccount()
-  const [isGranting, setIsGranting] = useState(false)
-  const [isChecking, setIsChecking] = useState(false)
-  const [votingRightStatus, setVotingRightStatus] = useState(null)
+  const { address, isConnected } = useAccount();
+  const [targetAddress, setTargetAddress] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState('');
+  const [votingRightStatus, setVotingRightStatus] = useState(null);
+  const [isChecking, setIsChecking] = useState(false);
 
-  // 處理獲得投票權
-  const handleGrantVotingRight = async () => {
-    if (!address) {
-      alert('請先連接錢包')
-      return
-    }
+  // 從環境變數獲取合約地址
+  const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
 
-    setIsGranting(true)
+  // 使用 wagmi 的 writeContract hook
+  const { writeContract, data: hash, isPending } = useWriteContract();
 
-    try {
-      const result = await giveRightToVote(address)
-      
-      if (result.success) {
-        if (result.alreadyHasRights) {
-          alert(`您已經擁有投票權！`)
-        } else {
-          alert(`投票權授予成功！\n交易哈希: ${result.txHash}`)
-        }
-        
-        // 更新狀態
-        setVotingRightStatus(true)
-        
-        // 調用成功回調
-        if (onSuccess) {
-          onSuccess(result)
-        }
-      } else {
-        alert(`授予失敗: ${result.message}`)
-        if (onError) {
-          onError(result)
-        }
-      }
-    } catch (error) {
-      console.error('獲得投票權失敗:', error)
-      alert('操作失敗，請檢查控制台')
-      if (onError) {
-        onError(error)
-      }
-    } finally {
-      setIsGranting(false)
-    }
-  }
+  // 等待交易確認
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  });
 
-  // 檢查投票權狀態
+  // 檢查投票權狀態的函數
   const handleCheckVotingRight = async () => {
-    if (!address) return
-
-    setIsChecking(true)
+    if (!isConnected || !address) return;
+    
+    setIsChecking(true);
     try {
-      const hasRight = await checkVotingRight(address)
-      setVotingRightStatus(hasRight)
+      // 這裡需要調用合約的檢查函數
+      // 暫時設為 null，需要根據您的合約實現
+      setVotingRightStatus(null);
     } catch (error) {
-      console.error('檢查投票權失敗:', error)
-      setVotingRightStatus(null)
+      console.error('檢查投票權失敗:', error);
     } finally {
-      setIsChecking(false)
+      setIsChecking(false);
     }
-  }
+  };
 
-  // 組件加載時自動檢查投票權狀態
-  React.useEffect(() => {
-    if (isConnected && address && showStatus) {
-      handleCheckVotingRight()
+  // 給予投票權的函數
+  const giveRightToVote = async (voterAddress) => {
+    try {
+      if (!isConnected) {
+        throw new Error('錢包未連接');
+      }
+
+      if (!voterAddress) {
+        throw new Error('請輸入有效的錢包地址');
+      }
+
+      if (!CONTRACT_ADDRESS) {
+        throw new Error('合約地址未配置');
+      }
+
+      setIsLoading(true);
+      setStatus('正在提交交易...');
+
+      // 調用合約的 giveRightToVote 函數
+      writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: contractABI,
+        functionName: 'giveRightToVote',
+        args: [voterAddress],
+      });
+
+    } catch (error) {
+      console.error('給予投票權失敗:', error);
+      setStatus(`錯誤: ${error.message}`);
+      setIsLoading(false);
+      if (onError) onError(error);
     }
-  }, [isConnected, address])
+  };
+
+  // 處理獲得投票權按鈕點擊
+  const handleGrantVotingRight = async () => {
+    if (address) {
+      await giveRightToVote(address);
+    }
+  };
+
+  // 處理交易狀態變化
+  useEffect(() => {
+    if (isPending) {
+      setStatus('交易提交中...');
+      setIsLoading(true);
+    } else if (isConfirming) {
+      setStatus('等待交易確認...');
+    } else if (isConfirmed) {
+      setStatus('✅ 投票權給予成功！');
+      setIsLoading(false);
+      setTargetAddress(''); // 清除輸入欄位
+      if (onSuccess) onSuccess({ hash, address });
+    } else if (hash && !isConfirming && !isConfirmed) {
+      setStatus('❌ 交易失敗');
+      setIsLoading(false);
+      if (onError) onError(new Error('交易失敗'));
+    }
+  }, [isPending, isConfirming, isConfirmed, hash, onSuccess, onError]);
+
+  // 組件掛載時檢查投票權
+  useEffect(() => {
+    if (isConnected && address && showStatus) {
+      handleCheckVotingRight();
+    }
+  }, [isConnected, address, showStatus]);
 
   // 如果是緊湊模式，只顯示按鈕
   if (compact) {
     return (
-      <button
-        onClick={handleGrantVotingRight}
-        disabled={!isConnected || isGranting}
-        style={{
-          padding: '10px 20px',
-          backgroundColor: !isConnected 
-            ? '#6c757d' 
-            : isGranting 
-              ? '#6c757d' 
+      <div className="give-right-compact">
+        <button
+          onClick={handleGrantVotingRight}
+          disabled={!isConnected || isLoading}
+          className={`give-right-btn ${
+            !isConnected 
+              ? 'disabled' 
+              : isLoading 
+                ? 'loading' 
+                : votingRightStatus 
+                  ? 'success' 
+                  : 'primary'
+          }`}
+        >
+          {!isConnected 
+            ? '🔒 需要連接錢包' 
+            : isLoading 
+              ? '⏳ 處理中...' 
               : votingRightStatus 
-                ? '#28a745' 
-                : '#007bff',
-          color: 'white',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: (!isConnected || isGranting) ? 'not-allowed' : 'pointer',
-          fontWeight: 'bold',
-          fontSize: '14px'
-        }}
-      >
-        {!isConnected 
-          ? '🔒 需要連接錢包' 
-          : isGranting 
-            ? '⏳ 處理中...' 
-            : votingRightStatus 
-              ? '✅ 已有投票權' 
-              : buttonText
-        }
-      </button>
-    )
+                ? '✅ 已有投票權' 
+                : buttonText
+          }
+        </button>
+      </div>
+    );
   }
 
   // 完整模式顯示
   return (
-    <div style={{
-      marginBottom: '20px',
-      padding: '15px',
-      backgroundColor: '#f8f9fa',
-      borderRadius: '8px',
-      border: '1px solid #ddd'
-    }}>
-      <h4 style={{ margin: '0 0 15px 0', color: '#000', fontSize: '16px' }}>
+    <div className="give-right-container">
+      <h4 className="give-right-title">
         🗳️ 投票權管理
       </h4>
 
       {/* 顯示當前狀態 */}
       {isConnected && address && showStatus && (
-        <div style={{ marginBottom: '15px' }}>
-          <p style={{ margin: '0 0 8px 0', color: '#000', fontSize: '14px' }}>
+        <div className="give-right-status">
+          <p className="wallet-address-info">
             <strong>錢包地址:</strong>
-            <br />
-            <code style={{ 
-              backgroundColor: '#e9ecef', 
-              padding: '2px 6px', 
-              borderRadius: '3px',
-              fontSize: '12px',
-              wordBreak: 'break-all'
-            }}>
+            <code className="wallet-address-code">
               {address}
             </code>
           </p>
           
           {votingRightStatus !== null && (
-            <p style={{ 
-              margin: '8px 0 0 0', 
-              color: votingRightStatus ? '#28a745' : '#dc3545',
-              fontWeight: 'bold',
-              fontSize: '14px'
-            }}>
+            <p className={`voting-right-status ${votingRightStatus ? 'has-right' : 'no-right'}`}>
               投票權狀態: {votingRightStatus ? '✅ 已擁有' : '❌ 未擁有'}
             </p>
           )}
@@ -159,30 +167,23 @@ function GiveRightToVote({
       )}
 
       {/* 操作按鈕 */}
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+      <div className="give-right-actions">
         <button
           onClick={handleGrantVotingRight}
-          disabled={!isConnected || isGranting}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: !isConnected 
-              ? '#6c757d' 
-              : isGranting 
-                ? '#6c757d' 
+          disabled={!isConnected || isLoading}
+          className={`give-right-btn ${
+            !isConnected 
+              ? 'disabled' 
+              : isLoading 
+                ? 'loading' 
                 : votingRightStatus 
-                  ? '#28a745' 
-                  : '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: (!isConnected || isGranting) ? 'not-allowed' : 'pointer',
-            fontWeight: 'bold',
-            fontSize: '14px'
-          }}
+                  ? 'success' 
+                  : 'primary'
+          }`}
         >
           {!isConnected 
             ? '🔒 需要連接錢包' 
-            : isGranting 
+            : isLoading 
               ? '⏳ 處理中...' 
               : votingRightStatus 
                 ? '✅ 已有投票權' 
@@ -194,38 +195,30 @@ function GiveRightToVote({
           <button
             onClick={handleCheckVotingRight}
             disabled={isChecking}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: isChecking ? '#6c757d' : '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: isChecking ? 'not-allowed' : 'pointer',
-              fontWeight: 'bold',
-              fontSize: '14px'
-            }}
+            className={`give-right-btn ${isChecking ? 'loading' : 'secondary'}`}
           >
             {isChecking ? '⏳ 檢查中...' : '🔍 重新檢查'}
           </button>
         )}
       </div>
 
+      {/* 狀態訊息顯示 */}
+      {status && showStatus && (
+        <div className="give-right-status">
+          <p className={`voting-right-status ${status.includes('✅') ? 'has-right' : 'no-right'}`}>
+            {status}
+          </p>
+        </div>
+      )}
+
       {/* 未連接錢包的提示 */}
       {!isConnected && (
-        <div style={{
-          marginTop: '15px',
-          padding: '10px',
-          backgroundColor: '#fff3cd',
-          borderRadius: '6px',
-          border: '1px solid #ffeaa7',
-          fontSize: '14px',
-          color: '#856404'
-        }}>
+        <div className="give-right-warning">
           ⚠️ 請先連接錢包才能管理投票權
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default GiveRightToVote
+export default GiveRightToVote;

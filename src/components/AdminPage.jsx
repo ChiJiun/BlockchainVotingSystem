@@ -3,6 +3,9 @@ import { useAccount, useReadContract } from 'wagmi'
 import { contractABI } from '../ABI.js'
 import ResetVoting from './ResetVoting.jsx'
 import SetVotingTime from './SetVotingTime';
+import StartVotingEarly from './StartVotingEarly.jsx';
+import EmergencyStop from './EmergencyStop.jsx';
+import ForceRevealResults from './ForceRevealResults.jsx';
 import './AdminPage.css'
 
 function AdminPage() {
@@ -143,6 +146,9 @@ function AdminPage() {
           console.error('設置失敗:', error);
         }}
       />
+      <StartVotingEarly account={address} />
+      <EmergencyStop account={address} />
+      <ForceRevealResults account={address} />
     </div>
   )
 }

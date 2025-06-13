@@ -322,4 +322,126 @@ const Time = () => {
   );
 };
 
+// 新增：導出獲取時間資料的函數
+export const getTimeData = async () => {
+  // 添加延遲函數
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// 添加重試機制的函數
+const retryWithDelay = async (fn, maxRetries = 3, delayMs = 1000) => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      
+      // 如果是速率限制錯誤，等待更長時間
+      const waitTime = error.message?.includes('Too Many Requests') ? 
+        delayMs * (i + 1) * 2 : delayMs * (i + 1);
+      
+      console.warn(`請求失敗，${waitTime}ms 後重試... (嘗試 ${i + 1}/${maxRetries})`);
+      await delay(waitTime);
+    }
+  }
+};
+
+  try {
+    const rpcUrl = import.meta.env.VITE_RPC_URL;
+    const contractAddress = import.meta.env.VITE_CONTRACT_ADDRESS;
+
+    if (!rpcUrl || !contractAddress) {
+      throw new Error('缺少必要的環境變數配置');
+    }
+
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const contract = new ethers.Contract(contractAddress, contractABI, provider);
+
+    const results = {};
+    const timeFields = [
+      { key: 'startTime', possibleNames: ['startTime'] },
+      { key: 'endTime', possibleNames: ['endTime'] },
+      { key: 'revealTime', possibleNames: ['revealTime'] }
+    ];
+
+    // 為每個時間欄位添加重試機制和延遲
+    for (const field of timeFields) {
+      let foundValue = null;
+      
+      for (const funcName of field.possibleNames) {
+        try {
+          if (typeof contract[funcName] === 'function') {
+            // 使用重試機制
+            foundValue = await retryWithDelay(async () => {
+              return await contract[funcName]();
+            }, 3, 1000);
+            break;
+          }
+        } catch (error) {
+          console.warn(`獲取 ${funcName} 失敗:`, error.message);
+        }
+      }
+      
+      results[field.key] = foundValue;
+      
+      // 在請求之間添加小延遲以避免速率限制
+      await delay(200);
+    }
+
+    return results;
+  } catch (error) {
+    console.error('獲取時間資料失敗:', error);
+    return null;
+  }
+};
+
+// 修改現有的 getCurrentPhaseValue 函數，使其更簡單
+export const getCurrentPhaseValue = (timeData, currentTime = new Date()) => {
+  try {
+    if (!timeData) return '未知階段';
+    
+    let startTimeNum = null;
+    let endTimeNum = null;
+    let revealTimeNum = null;
+    
+    if (timeData.startTime) {
+      startTimeNum = typeof timeData.startTime === 'bigint' ? 
+        Number(timeData.startTime) : 
+        (timeData.startTime._hex ? parseInt(timeData.startTime._hex, 16) : Number(timeData.startTime));
+    }
+    
+    if (timeData.endTime) {
+      endTimeNum = typeof timeData.endTime === 'bigint' ? 
+        Number(timeData.endTime) : 
+        (timeData.endTime._hex ? parseInt(timeData.endTime._hex, 16) : Number(timeData.endTime));
+    }
+    
+    if (timeData.revealTime) {
+      revealTimeNum = typeof timeData.revealTime === 'bigint' ? 
+        Number(timeData.revealTime) : 
+        (timeData.revealTime._hex ? parseInt(timeData.revealTime._hex, 16) : Number(timeData.revealTime));
+    }
+    
+    if (!startTimeNum || !endTimeNum) return '未知階段';
+    
+    const startTime = new Date(startTimeNum * 1000);
+    const endTime = new Date(endTimeNum * 1000);
+    const revealTime = revealTimeNum ? new Date(revealTimeNum * 1000) : null;
+
+    if (currentTime < startTime) {
+      return '投票尚未開始';
+    } else if (currentTime >= startTime && currentTime < endTime) {
+      return '投票進行中';
+    } else if (revealTime && currentTime >= endTime && currentTime < revealTime) {
+      return '投票已結束，等待揭曉';
+    } else if (revealTime && currentTime >= revealTime) {
+      return '結果已揭曉';
+    } else {
+      return '投票已結束';
+    }
+  } catch (error) {
+    console.error('階段判斷錯誤:', error);
+    return '狀態錯誤';
+  }
+};
+
 export default Time;

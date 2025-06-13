@@ -10,7 +10,7 @@ git config --global --add safe.directory D:/Code/Blockchian/BlockchainVotingSyst
 
 git status
 git add .
-git commit -m "Results"
+git commit -m "Alomost done"
 git push origin main
 
 # 執行合約腳本

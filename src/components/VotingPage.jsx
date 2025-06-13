@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useAccount, useReadContract } from 'wagmi'
 import { contractABI } from '../ABI.js'
-import { giveRightToVote } from './giveRight.js'
-import Time from "./Time.jsx"
-import CommitButton from './CommitButton.jsx'
+import Time, { getTimeData, getCurrentPhaseValue } from "./Time.jsx"
+import MetaCommitVote from './MetaCommitVote.jsx';
+import RevealVote from './RevealVote.jsx';
 import './VotingPage.css'
 
 function VotingPage() {
@@ -11,6 +11,8 @@ function VotingPage() {
   const [proposals, setProposals] = useState([])
   const [isGranting, setIsGranting] = useState(false)
   const [selectedProposalIndex, setSelectedProposalIndex] = useState(null)
+  const [currentPhase, setCurrentPhase] = useState('載入中...') // 當前階段狀態
+  const [timeData, setTimeData] = useState(null) // 時間資料狀態
   
   // 從環境變數讀取智能合約地址
   const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS
@@ -173,26 +175,59 @@ function VotingPage() {
     }
   }, [proposalsData])
 
+  // 獲取時間資料並計算當前階段
+  useEffect(() => {
+    const fetchAndUpdatePhase = async () => {
+      try {
+        const data = await getTimeData()
+        if (data) {
+          setTimeData(data)
+          const phase = getCurrentPhaseValue(data, new Date())
+          setCurrentPhase(phase)
+        } else {
+          setCurrentPhase('無法獲取時間資料')
+        }
+      } catch (error) {
+        console.error('獲取階段狀態失敗:', error)
+        setCurrentPhase('狀態錯誤')
+      }
+    }
+
+    // 初始獲取
+    fetchAndUpdatePhase()
+
+    // 降低更新頻率：從 30 秒改為 2 分鐘
+    const dataInterval = setInterval(fetchAndUpdatePhase, 120000)
+
+    return () => clearInterval(dataInterval)
+  }, [])
+
+  // 每秒更新階段狀態（使用已獲取的時間資料）
+  useEffect(() => {
+    if (!timeData) return
+
+    const updatePhase = () => {
+      try {
+        const phase = getCurrentPhaseValue(timeData, new Date())
+        setCurrentPhase(phase)
+      } catch (error) {
+        console.error('更新階段狀態失敗:', error)
+        setCurrentPhase('狀態錯誤')
+      }
+    }
+
+    // 每秒更新階段
+    const phaseInterval = setInterval(updatePhase, 1000)
+
+    return () => clearInterval(phaseInterval)
+  }, [timeData])
+
   // 檢查合約地址
   if (!CONTRACT_ADDRESS) {
     return (
       <div className="error-container">
         <h2 className="voting-page-title">📋 投票系統</h2>
         <p className="error-message">❌ 未設定合約地址，檢查 .env 文件中的 VITE_CONTRACT_ADDRESS</p>
-      </div>
-    )
-  }
-
-  // 載入狀態
-  if (proposalsLoading) {
-    return (
-      <div className="error-container">
-        <h2 className="voting-page-title">📋 投票系統</h2>
-        <p className="loading-message">⏳ 載入中...</p>
-        <div className="network-info">
-          <p>合約地址: {CONTRACT_ADDRESS}</p>
-          {chain && <p>網路: {chain?.name} ({chain?.id})</p>}
-        </div>
       </div>
     )
   }
@@ -229,6 +264,9 @@ function VotingPage() {
     )
   }
 
+  // 現在您可以在整個組件中使用 currentPhase 變數
+  console.log('當前投票階段:', currentPhase)
+
   // 主要渲染
   return (
     <div className="voting-page">
@@ -239,6 +277,54 @@ function VotingPage() {
         <Time />
       </div>
       
+      {/* 根據階段顯示不同的狀態提示 */}
+      {currentPhase === '投票尚未開始' && (
+        <div style={{ padding: '15px', background: '#fff3cd', borderRadius: '8px', margin: '15px 0', textAlign: 'center' }}>
+          ⏳ 投票尚未開始，請等待投票開始時間
+        </div>
+      )}
+
+      {currentPhase === '投票進行中' && (
+        <div style={{ padding: '15px', background: '#d1ecf1', borderRadius: '8px', margin: '15px 0', textAlign: 'center' }}>
+          ✅ 投票正在進行中，您可以提交投票！
+        </div>
+      )}
+
+      {currentPhase === '投票已結束，等待揭曉' && (
+        <div style={{ padding: '15px', background: '#fff3cd', borderRadius: '8px', margin: '15px 0', textAlign: 'center' }}>
+          ⏰ 投票已結束，現在可以揭曉您的投票！
+        </div>
+      )}
+
+      {currentPhase === '結果已揭曉' && (
+        <div style={{ padding: '15px', background: '#d4edda', borderRadius: '8px', margin: '15px 0', textAlign: 'center' }}>
+          🎉 投票結果已揭曉！
+        </div>
+      )}
+
+      {currentPhase === '投票已結束' && (
+        <div style={{ padding: '15px', background: '#f8d7da', borderRadius: '8px', margin: '15px 0', textAlign: 'center' }}>
+          ⏹️ 投票已結束
+        </div>
+      )}
+
+      {/* 連接信息 */}
+      {isConnected ? (
+        <div className="connection-info connected">
+          <div className="connection-grid">
+            <div><strong>錢包狀態:</strong> ✅ 已連接</div>
+            <div><strong>網路:</strong> {chain?.name} ({chain?.id})</div>
+            <div className="connection-grid-full"><strong>錢包地址:</strong> {address}</div>
+            <div className="connection-grid-full"><strong>合約地址:</strong> {CONTRACT_ADDRESS}</div>
+          </div>
+        </div>
+      ) : (
+        <div className="connection-info disconnected">
+          <p>ℹ️ 請先連接錢包才能進行操作</p>
+          <p><strong>合約地址:</strong> {CONTRACT_ADDRESS}</p>
+        </div>
+      )}
+
       {/* 投票權區域 */}
       <div className="voting-rights-section">
         <div className="voting-rights-content">
@@ -266,30 +352,42 @@ function VotingPage() {
           )}
         </div>
       </div>
-
-      {/* 連接信息 */}
-      {isConnected ? (
-        <div className="connection-info connected">
-          <div className="connection-grid">
-            <div><strong>錢包狀態:</strong> ✅ 已連接</div>
-            <div><strong>網路:</strong> {chain?.name} ({chain?.id})</div>
-            <div className="connection-grid-full"><strong>錢包地址:</strong> {address}</div>
-            <div className="connection-grid-full"><strong>合約地址:</strong> {CONTRACT_ADDRESS}</div>
-          </div>
-        </div>
-      ) : (
-        <div className="connection-info disconnected">
-          <p>ℹ️ 請先連接錢包才能進行操作</p>
-          <p><strong>合約地址:</strong> {CONTRACT_ADDRESS}</p>
-        </div>
+      
+      {/* 條件性顯示 MetaCommitVote 組件 - 僅在投票進行中時顯示 */}
+      {currentPhase === '投票進行中' && (
+        <MetaCommitVote 
+          proposals={proposals}
+          selectedProposalIndex={selectedProposalIndex}
+          onProposalSelect={setSelectedProposalIndex}
+          currentPhase={currentPhase}
+        />
       )}
       
-      {/* CommitButton 組件 */}
-      <CommitButton 
-        proposals={proposals}
-        selectedProposalIndex={selectedProposalIndex}
-        onProposalSelect={setSelectedProposalIndex}
-      />
+      {/* 條件性顯示 RevealVote 組件 - 僅在投票結束等待揭曉期間顯示 */}
+      {currentPhase === '投票已結束，等待揭曉' && (
+        <RevealVote 
+          onRevealSuccess={(data) => console.log('揭曉成功:', data)}
+          onRevealError={(error) => console.error('揭曉失敗:', error)}
+          currentPhase={currentPhase}
+        />
+      )}
+
+      {/* 在頁面底部顯示當前階段 */}
+      <div className="phase-display-footer">
+        <div className="phase-display-content">
+          <h4>📊 當前投票階段</h4>
+          <div className={`phase-status-display ${
+            currentPhase.includes('進行中') ? 'active' : 
+            currentPhase.includes('已結束') && currentPhase.includes('等待揭曉') ? 'ended' : 
+            currentPhase.includes('已揭曉') ? 'revealed' : 'pending'
+          }`}>
+            {currentPhase}
+          </div>
+          <div className="phase-timestamp">
+            更新時間: {new Date().toLocaleString('zh-TW')}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
