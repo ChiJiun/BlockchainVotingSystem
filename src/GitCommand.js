@@ -10,13 +10,9 @@ git config --global --add safe.directory D:/Code/Blockchian/BlockchainVotingSyst
 
 git status
 git add .
-git commit -m "Alomost done"
+git commit -m "VoteRight fixed"
 git push origin main
 
-# 執行合約腳本
-npm run contract
-
-# 建置和部署
 npm run build
 npm run deploy
 

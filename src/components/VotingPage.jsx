@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAccount, useReadContract } from 'wagmi'
 import { contractABI } from '../ABI.js'
 import Time, { getTimeData, getCurrentPhaseValue } from "./Time.jsx"
+import GiveRightToVote from './GiveRightToVote.jsx'
 import MetaCommitVote from './MetaCommitVote.jsx';
 import RevealVote from './RevealVote.jsx';
 import './VotingPage.css'
@@ -9,7 +10,6 @@ import './VotingPage.css'
 function VotingPage() {
   const { isConnected, address, chain } = useAccount()
   const [proposals, setProposals] = useState([])
-  const [isGranting, setIsGranting] = useState(false)
   const [selectedProposalIndex, setSelectedProposalIndex] = useState(null)
   const [currentPhase, setCurrentPhase] = useState('載入中...') // 當前階段狀態
   const [timeData, setTimeData] = useState(null) // 時間資料狀態
@@ -24,31 +24,6 @@ function VotingPage() {
     functionName: 'getAllProposals',
     enabled: !!CONTRACT_ADDRESS,
   })
-
-  // 處理獲得投票權
-  const handleGrantVotingRight = async () => {
-    if (!isConnected || !address) {
-      alert('請先連接錢包')
-      return
-    }
-
-    setIsGranting(true)
-
-    try {
-      const result = await giveRightToVote(address)
-      
-      if (result.success) {
-        alert(`投票權獲得成功！\n目標地址: ${address}\n交易哈希: ${result.txHash}`)
-      } else {
-        alert(`獲得失敗: ${result.message}`)
-      }
-    } catch (error) {
-      console.error('獲得投票權失敗:', error)
-      alert('操作失敗，請檢查控制台')
-    } finally {
-      setIsGranting(false)
-    }
-  }
 
   // 轉換 Solidity 字符串
   const convertSolidityString = (value) => {
@@ -264,9 +239,6 @@ function VotingPage() {
     )
   }
 
-  // 現在您可以在整個組件中使用 currentPhase 變數
-  console.log('當前投票階段:', currentPhase)
-
   // 主要渲染
   return (
     <div className="voting-page">
@@ -325,33 +297,17 @@ function VotingPage() {
         </div>
       )}
 
-      {/* 投票權區域 */}
-      <div className="voting-rights-section">
-        <div className="voting-rights-content">
-          {isConnected && address ? (
-            <div>
-              <p className="wallet-address-display">
-                <strong>目標錢包地址:</strong> 
-                <code className="wallet-address-code">{address}</code>
-              </p>
-              <button
-                onClick={handleGrantVotingRight}
-                disabled={isGranting}
-                className={`grant-voting-button ${isGranting ? 'loading' : 'active'}`}
-              >
-                {isGranting ? '⏳ 獲得中...' : '✅ 認證獲得投票權'}
-              </button>
-            </div>
-          ) : (
-            <div>
-              <p className="wallet-warning">⚠️ 請先連接錢包才能獲得投票權</p>
-              <button disabled className="grant-voting-button disabled">
-                🔒 需要連接錢包
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* 單純導入 GiveRightToVote 組件作為按鈕 */}
+      <GiveRightToVote 
+        buttonText="✅ 認證獲得投票權"
+        onSuccess={(result) => {
+          console.log('投票權獲得成功:', result);
+        }}
+        onError={(error) => {
+          console.error('投票權獲得失敗:', error);
+        }}
+        showStatus={true}
+      />
       
       {/* 條件性顯示 MetaCommitVote 組件 - 僅在投票進行中時顯示 */}
       {currentPhase === '投票進行中' && (
@@ -370,6 +326,39 @@ function VotingPage() {
           onRevealError={(error) => console.error('揭曉失敗:', error)}
           currentPhase={currentPhase}
         />
+      )}
+
+      {/* 如果投票尚未開始或已完全結束，顯示提案列表（僅供查看） */}
+      {(currentPhase === '投票尚未開始' || currentPhase === '結果已揭曉' || currentPhase === '投票已結束') && proposals.length > 0 && (
+        <div style={{ marginTop: '20px' }}>
+          <h3 style={{ textAlign: 'center', marginBottom: '15px' }}>📋 提案列表</h3>
+          <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px' }}>
+            {proposals.map((proposal, index) => (
+              <div key={proposal.id} style={{ 
+                padding: '10px', 
+                margin: '5px 0', 
+                background: 'white', 
+                borderRadius: '5px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span><strong>提案 {index + 1}:</strong> {proposal.name}</span>
+                {currentPhase === '結果已揭曉' && (
+                  <span style={{ 
+                    background: '#28a745', 
+                    color: 'white', 
+                    padding: '3px 8px', 
+                    borderRadius: '12px',
+                    fontSize: '12px'
+                  }}>
+                    票數: {proposal.voteCount}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* 在頁面底部顯示當前階段 */}

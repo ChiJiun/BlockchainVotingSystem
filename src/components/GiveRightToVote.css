@@ -10,6 +10,7 @@
   margin: 0 0 15px 0;
   color: #000;
   font-size: 16px;
+  text-align: center;
 }
 
 .give-right-status {
@@ -20,6 +21,7 @@
   margin: 0 0 8px 0;
   color: #000;
   font-size: 14px;
+  text-align: center;
 }
 
 .wallet-address-code {
@@ -36,6 +38,7 @@
   margin: 8px 0 0 0;
   font-weight: bold;
   font-size: 14px;
+  text-align: center;
 }
 
 .voting-right-status.has-right {
@@ -46,20 +49,22 @@
   color: #dc3545;
 }
 
-.give-right-actions {
+/* 置中的按鈕容器 */
+.give-right-actions-center {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  justify-content: center;
+  margin: 20px 0;
 }
 
 .give-right-btn {
-  padding: 10px 20px;
+  padding: 12px 24px;
   color: white;
   border: none;
-  border-radius: 5px;
+  border-radius: 8px;
   font-weight: bold;
   font-size: 14px;
   transition: all 0.3s ease;
+  min-width: 200px;
 }
 
 .give-right-btn:not(:disabled) {
@@ -76,7 +81,7 @@
 
 .give-right-btn.primary:hover:not(:disabled) {
   background-color: #0056b3;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 .give-right-btn.success {
@@ -85,24 +90,30 @@
 
 .give-right-btn.success:hover:not(:disabled) {
   background-color: #218838;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
-.give-right-btn.secondary {
-  background-color: #6c757d;
+/* 已有投票權狀態的按鈕樣式 - 保持綠色但禁用互動 */
+.give-right-btn.success.disabled {
+  background-color: #28a745;
+  opacity: 0.8;
+  cursor: not-allowed;
+  transform: none;
 }
 
-.give-right-btn.secondary:hover:not(:disabled) {
-  background-color: #545b62;
-  transform: translateY(-1px);
+.give-right-btn.success.disabled:hover {
+  background-color: #28a745;
+  transform: none;
 }
 
 .give-right-btn.disabled {
   background-color: #6c757d;
+  opacity: 0.6;
 }
 
 .give-right-btn.loading {
-  background-color: #6c757d;
+  background-color: #ffc107;
+  color: #212529;
 }
 
 .give-right-warning {
@@ -113,11 +124,25 @@
   border: 1px solid #ffeaa7;
   font-size: 14px;
   color: #856404;
+  text-align: center;
+}
+
+/* 新增：已有投票權的提示樣式 */
+.give-right-info {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #d4edda;
+  border-radius: 6px;
+  border: 1px solid #c3e6cb;
+  font-size: 14px;
+  color: #155724;
+  text-align: center;
 }
 
 /* 緊湊模式樣式 */
 .give-right-compact {
-  display: inline-block;
+  display: flex;
+  justify-content: center;
 }
 
 .give-right-compact .give-right-btn {
@@ -126,12 +151,14 @@
 
 /* 響應式設計 */
 @media (max-width: 768px) {
-  .give-right-actions {
+  .give-right-actions-center {
     flex-direction: column;
+    align-items: center;
   }
   
   .give-right-btn {
     width: 100%;
+    max-width: 300px;
     text-align: center;
   }
   
@@ -156,5 +183,6 @@
   .give-right-btn {
     padding: 12px 16px;
     font-size: 13px;
+    min-width: auto;
   }
 }

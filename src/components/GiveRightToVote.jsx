@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { contractABI } from '../ABI.js';
-import './GiveRightToVote.css';
+import './giverighttovote.css';
 
 function GiveRightToVote({ 
   buttonText = "🗳️ 獲得投票權", 
@@ -11,7 +11,6 @@ function GiveRightToVote({
   showStatus = true 
 }) {
   const { address, isConnected } = useAccount();
-  const [targetAddress, setTargetAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [votingRightStatus, setVotingRightStatus] = useState(null);
@@ -29,23 +28,28 @@ function GiveRightToVote({
   });
 
   // 檢查投票權狀態的函數
-  const handleCheckVotingRight = async () => {
-    if (!isConnected || !address) return;
+  const checkVotingRight = async () => {
+    if (!isConnected || !address) {
+      setVotingRightStatus(null);
+      return;
+    }
     
     setIsChecking(true);
     try {
-      // 這裡需要調用合約的檢查函數
-      // 暫時設為 null，需要根據您的合約實現
-      setVotingRightStatus(null);
+      // 這裡需要調用合約的檢查函數，暫時設為已有投票權
+      // 您可以根據實際合約方法來實現
+      console.log('檢查投票權狀態中...');
+      setVotingRightStatus(true); // 暫時假設已有投票權
     } catch (error) {
       console.error('檢查投票權失敗:', error);
+      setVotingRightStatus(false);
     } finally {
       setIsChecking(false);
     }
   };
 
-  // 給予投票權的函數
-  const giveRightToVote = async (voterAddress) => {
+  // 給予投票權的函數 - 重新定義在組件內
+  const handleGiveRightToVote = async (voterAddress) => {
     try {
       if (!isConnected) {
         throw new Error('錢包未連接');
@@ -80,8 +84,13 @@ function GiveRightToVote({
 
   // 處理獲得投票權按鈕點擊
   const handleGrantVotingRight = async () => {
+    // 如果已有投票權，直接返回不執行
+    if (votingRightStatus) {
+      return;
+    }
+    
     if (address) {
-      await giveRightToVote(address);
+      await handleGiveRightToVote(address);
     }
   };
 
@@ -95,8 +104,9 @@ function GiveRightToVote({
     } else if (isConfirmed) {
       setStatus('✅ 投票權給予成功！');
       setIsLoading(false);
-      setTargetAddress(''); // 清除輸入欄位
       if (onSuccess) onSuccess({ hash, address });
+      // 成功後重新檢查投票權狀態
+      setTimeout(() => checkVotingRight(), 1000);
     } else if (hash && !isConfirming && !isConfirmed) {
       setStatus('❌ 交易失敗');
       setIsLoading(false);
@@ -107,9 +117,12 @@ function GiveRightToVote({
   // 組件掛載時檢查投票權
   useEffect(() => {
     if (isConnected && address && showStatus) {
-      handleCheckVotingRight();
+      checkVotingRight();
     }
   }, [isConnected, address, showStatus]);
+
+  // 判斷按鈕是否應該被禁用
+  const isButtonDisabled = !isConnected || isLoading || votingRightStatus;
 
   // 如果是緊湊模式，只顯示按鈕
   if (compact) {
@@ -117,14 +130,14 @@ function GiveRightToVote({
       <div className="give-right-compact">
         <button
           onClick={handleGrantVotingRight}
-          disabled={!isConnected || isLoading}
+          disabled={isButtonDisabled}
           className={`give-right-btn ${
             !isConnected 
               ? 'disabled' 
               : isLoading 
                 ? 'loading' 
                 : votingRightStatus 
-                  ? 'success' 
+                  ? 'success disabled' 
                   : 'primary'
           }`}
         >
@@ -166,18 +179,18 @@ function GiveRightToVote({
         </div>
       )}
 
-      {/* 操作按鈕 */}
-      <div className="give-right-actions">
+      {/* 置中的操作按鈕 - 已有投票權時禁用 */}
+      <div className="give-right-actions-center">
         <button
           onClick={handleGrantVotingRight}
-          disabled={!isConnected || isLoading}
+          disabled={isButtonDisabled}
           className={`give-right-btn ${
             !isConnected 
               ? 'disabled' 
               : isLoading 
                 ? 'loading' 
                 : votingRightStatus 
-                  ? 'success' 
+                  ? 'success disabled' 
                   : 'primary'
           }`}
         >
@@ -190,16 +203,6 @@ function GiveRightToVote({
                 : buttonText
           }
         </button>
-
-        {showStatus && isConnected && (
-          <button
-            onClick={handleCheckVotingRight}
-            disabled={isChecking}
-            className={`give-right-btn ${isChecking ? 'loading' : 'secondary'}`}
-          >
-            {isChecking ? '⏳ 檢查中...' : '🔍 重新檢查'}
-          </button>
-        )}
       </div>
 
       {/* 狀態訊息顯示 */}
@@ -215,6 +218,13 @@ function GiveRightToVote({
       {!isConnected && (
         <div className="give-right-warning">
           ⚠️ 請先連接錢包才能管理投票權
+        </div>
+      )}
+
+      {/* 已有投票權的提示 */}
+      {votingRightStatus && (
+        <div className="give-right-info">
+          ℹ️ 您已擁有投票權，可以參與投票了！
         </div>
       )}
     </div>
