@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAccount, useReadContract } from 'wagmi'
 import { contractABI } from '../ABI.js'
 import ResetVoting from './ResetVoting.jsx'
+import SetVotingTime from './SetVotingTime';
 import './AdminPage.css'
 
 function AdminPage() {
@@ -10,6 +11,7 @@ function AdminPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [newProposal, setNewProposal] = useState({ title: '', description: '' })
   const [proposals, setProposals] = useState([])
+  const [showSetTimeModal, setShowSetTimeModal] = useState(false);
 
   // 從環境變數獲取合約地址
   const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS
@@ -131,6 +133,16 @@ function AdminPage() {
         </div>
       </h2>
       <ResetVoting account={address} />
+      <SetVotingTime
+        onClose={() => setShowSetTimeModal(false)}
+        onSuccess={(result) => {
+          console.log('設置成功:', result);
+          setShowSetTimeModal(false);
+        }}
+        onError={(error) => {
+          console.error('設置失敗:', error);
+        }}
+      />
     </div>
   )
 }

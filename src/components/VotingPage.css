@@ -7,7 +7,7 @@
 .voting-page-title {
   text-align: center;
   margin-bottom: 30px;
-  color: #000;
+  color: #333;
 }
 
 .error-container {
@@ -171,4 +171,33 @@
 
 .connection-info p:not(:first-child) {
   margin-top: 8px;
+}
+
+/* Time 組件置中樣式 */
+.time-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 30px;
+}
+
+/* 確保 Time 組件內部內容也置中 */
+.time-center > * {
+  margin: 0 auto;
+  text-align: center;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .time-center {
+    margin: 20px 0;
+    padding: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .time-center {
+    margin: 15px 0;
+    padding: 8px;
+  }
 }

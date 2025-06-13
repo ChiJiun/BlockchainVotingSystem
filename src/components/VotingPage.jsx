@@ -233,7 +233,11 @@ function VotingPage() {
   return (
     <div className="voting-page">
       <h2 className="voting-page-title">📋 投票系統</h2>
-      <Time />
+      
+      {/* Time 組件置中顯示 */}
+      <div className="time-center">
+        <Time />
+      </div>
       
       {/* 投票權區域 */}
       <div className="voting-rights-section">

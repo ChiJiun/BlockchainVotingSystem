@@ -1,8 +1,8 @@
 /* to-do
     Voting Page:
-
+        revealVote: 揭示投票
+        
     Results Page:
-        getAllProposals: 獲取所有提案資料
 
     
     Admin Page:
