@@ -10,7 +10,7 @@ git config --global --add safe.directory D:/Code/Blockchian/BlockchainVotingSyst
 
 git status
 git add .
-git commit -m "VoteRight fixed"
+git commit -m "VoteRight button"
 git push origin main
 
 npm run build

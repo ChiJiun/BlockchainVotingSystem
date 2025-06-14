@@ -4,6 +4,9 @@
   background-color: #f8f9fa;
   border-radius: 8px;
   border: 1px solid #ddd;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .give-right-title {
@@ -18,20 +21,27 @@
 }
 
 .wallet-address-info {
-  margin: 0 0 8px 0;
+  margin: 0 0 15px 0;
   color: #000;
   font-size: 14px;
   text-align: center;
 }
 
+.wallet-address-info p {
+  margin: 0 0 5px 0;
+  font-weight: bold;
+}
+
 .wallet-address-code {
   background-color: #e9ecef;
-  padding: 2px 6px;
-  border-radius: 3px;
+  padding: 8px 12px;
+  border-radius: 6px;
   font-size: 12px;
+  font-family: monospace;
   word-break: break-all;
-  display: block;
+  display: inline-block;
   margin-top: 4px;
+  border: 1px solid #dee2e6;
 }
 
 .voting-right-status {
@@ -45,8 +55,20 @@
   color: #28a745;
 }
 
+.voting-right-status.already-has-right {
+  color: #28a745;
+}
+
 .voting-right-status.no-right {
   color: #dc3545;
+}
+
+.voting-right-status.error {
+  color: #dc3545;
+}
+
+.voting-right-status.warning {
+  color: #ffc107;
 }
 
 /* 置中的按鈕容器 */
@@ -64,7 +86,7 @@
   font-weight: bold;
   font-size: 14px;
   transition: all 0.3s ease;
-  min-width: 200px;
+  min-width: 180px;
 }
 
 .give-right-btn:not(:disabled) {
@@ -93,15 +115,14 @@
   transform: translateY(-2px);
 }
 
-/* 已有投票權狀態的按鈕樣式 - 保持綠色但禁用互動 */
-.give-right-btn.success.disabled {
+/* 已有投票權狀態的按鈕樣式 */
+.give-right-btn.already-has-right {
   background-color: #28a745;
-  opacity: 0.8;
-  cursor: not-allowed;
-  transform: none;
+  opacity: 0.9;
+  cursor: default;
 }
 
-.give-right-btn.success.disabled:hover {
+.give-right-btn.already-has-right:hover {
   background-color: #28a745;
   transform: none;
 }
@@ -127,30 +148,12 @@
   text-align: center;
 }
 
-/* 新增：已有投票權的提示樣式 */
-.give-right-info {
-  margin-top: 15px;
-  padding: 10px;
-  background-color: #d4edda;
-  border-radius: 6px;
-  border: 1px solid #c3e6cb;
-  font-size: 14px;
-  color: #155724;
-  text-align: center;
-}
-
-/* 緊湊模式樣式 */
-.give-right-compact {
-  display: flex;
-  justify-content: center;
-}
-
-.give-right-compact .give-right-btn {
-  margin: 0;
-}
-
 /* 響應式設計 */
 @media (max-width: 768px) {
+  .give-right-container {
+    max-width: 90%;
+  }
+  
   .give-right-actions-center {
     flex-direction: column;
     align-items: center;
@@ -158,18 +161,20 @@
   
   .give-right-btn {
     width: 100%;
-    max-width: 300px;
+    max-width: 250px;
     text-align: center;
   }
   
   .wallet-address-code {
     font-size: 11px;
+    padding: 6px 10px;
   }
 }
 
 @media (max-width: 480px) {
   .give-right-container {
     padding: 12px;
+    max-width: 95%;
   }
   
   .give-right-title {
